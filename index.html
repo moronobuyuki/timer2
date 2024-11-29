@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>受験タイマー</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #fff;
+      font-family: 'Arial', sans-serif;
+    }
+    #timer, #elapsed, #message {
+      font-size: 4vw;
+      font-weight: bold;
+      margin: 20px 0;
+      text-align: center;
+    }
+    #message {
+      color: #444;
+    }
+    #controls, #toggle-controls {
+      margin: 10px 0;
+      text-align: center;
+    }
+    button, select, input[type="datetime-local"] {
+      font-size: 1.5rem;
+      padding: 0.5rem 1rem;
+      border: 2px solid #000;
+      border-radius: 10px;
+      margin: 0.5rem;
+      cursor: pointer;
+    }
+    button:hover, select:hover {
+      background-color: #333;
+      color: #fff;
+    }
+    #timer.urgent, #elapsed.urgent {
+      color: red;
+      font-size: 5vw;
+      transition: color 0.5s, font-size 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <div id="timer" style="display: none;">カウントダウン: 0日 0時間 0分 0.0秒</div>
+  <div id="elapsed" style="display: none;">経過時間: 0時間 0分 0秒</div>
+  <div id="message">未来を変える行動を今始めましょう。</div>
+  
+  <div id="controls">
+    <input type="datetime-local" id="datetime-picker" value="2025-02-14T09:00" />
+    <button id="start-timer">スタート</button>
+  </div>
+
+  <div id="toggle-controls">
+    <select id="view-selector">
+      <option value="both">両方表示</option>
+      <option value="countdown">カウントダウンのみ</option>
+      <option value="elapsed">経過時間のみ</option>
+    </select>
+  </div>
+
+  <script>
+    const timerDisplay = document.getElementById('timer');
+    const elapsedDisplay = document.getElementById('elapsed');
+    const messageDisplay = document.getElementById('message');
+    const datetimePicker = document.getElementById('datetime-picker');
+    const startButton = document.getElementById('start-timer');
+    const viewSelector = document.getElementById('view-selector');
+    let intervalId, messageIntervalId;
+    let startTime;
+
+
+    const messages = [
+  // 汎用メッセージ50個
+  "時間は待ってくれません。今すぐ行動を！",
+  "あなたの未来を作るのは今の努力です。",
+  "今、最善を尽くせていますか？",
+  "この瞬間の積み重ねが成功を生む。",
+  "今日やらなければ、いつやるのですか？",
+  "最善の行動は、今すぐ始めること。",
+  "時間はあなたの味方にも敵にもなります。",
+  "もう一歩先へ進む勇気を持とう。",
+  "あなたの行動が、未来の可能性を広げる。",
+  "今を無駄にしないでください。",
+  "大きな目標も小さな一歩から始まる。",
+  "選択の結果が未来を変える。",
+  "時間を制する者が、人生を制する。",
+  "あなたのベストはまだ先にあります。",
+  "未来を信じて、今を頑張ってください。",
+  "行動しない理由を探していませんか？",
+  "自分に厳しく、目標に優しく。",
+  "成功するために、何をすべきですか？",
+  "あなたが変われば、世界も変わります。",
+  "「あと少し」が成功への鍵です。",
+  "誰もが同じ24時間を持っています。",
+  "あなたの可能性を信じています。",
+  "一瞬の努力が、人生を変えることもある。",
+  "今の努力が、未来の自分を救います。",
+  "毎日の一歩が、夢に近づく鍵です。",
+  "挑戦することが、成長の第一歩。",
+  "後悔のない一日を作りましょう。",
+  "何を始めるにも、今が最適な時です。",
+  "あなたのゴールはもうすぐそこです。",
+  "一歩ずつ、着実に前進しましょう。",
+  "行動は、成功の唯一の鍵です。",
+  "未来を変えるチャンスは今ここにあります。",
+  "小さな進歩が大きな成果を生む。",
+  "迷うより、まず動いてみましょう。",
+  "計画するだけではなく、行動を。",
+  "今の努力が、後の自信に変わる。",
+  "どんな壁も、乗り越える力を信じて。",
+  "成功の道は、今この瞬間に開かれる。",
+  "新しい挑戦は、あなたを成長させます。",
+  "今、行動を起こす理由は何ですか？",
+  "時間を無駄にしない決断を。",
+  "成功の秘訣は、あきらめないこと。",
+  "あなたが行動すれば、すべてが変わります。",
+  "努力は、必ず報われます。",
+  "チャンスは、行動する人に訪れます。",
+  "あなたの一歩が未来を変えます。",
+  "今日の行動が、未来を決めます。",
+  "どんな小さな努力も、大切です。",
+  "結果を出すためには、今が最重要です。",
+  
+  // 受験向けメッセージ50個
+  "1問解くごとに未来が近づいています。",
+  "あなたの合格はこの瞬間の努力にかかっています。",
+  "この10分で解ける問題はありませんか？",
+  "次に進むための壁を超えよう。",
+  "今日の努力が、明日の結果を作ります。",
+  "時間は無限ではありません。今、集中を！",
+  "努力の積み重ねが成功を引き寄せる。",
+  "目の前の問題に全力で挑もう。",
+  "合格を掴むために、今何ができますか？",
+  "あと1問解ければ合格点に近づく！",
+  "試験はすぐそこ、あなたの力を信じて。",
+  "苦手な問題にも挑戦する価値がある。",
+  "結果が変わるのは、今この瞬間の行動。",
+  "失敗を恐れず、挑戦を続けましょう。",
+  "目標に向かって、最後まで諦めないで。",
+  "この瞬間の努力が、未来の成功に繋がる。",
+  "わからない問題を後回しにしすぎていませんか？",
+  "勉強するほど、自信がついてくる。",
+  "あなたが努力を止めなければ、合格も止まらない。",
+  "今やらないと、後悔するのはいつですか？",
+  "時間を意識して、最短でゴールへ。",
+  "自分の限界を信じないでください。それを超えられる。",
+  "努力は嘘をつきません。そのまま進んでください。",
+  "試験日はあなたの成果を発揮する日です。",
+  "何度も解くことで問題が見えてくる。",
+  "時間配分を忘れずに、最後まで頑張って。",
+  "休憩も大事ですが、今は集中する時間です。",
+  "次の休憩まで、あと少し頑張りましょう。",
+  "得点源を確実に狙うための努力を。",
+  "苦手科目に挑むのが合格の近道です。",
+  "あと少し、諦めずに続けてください。",
+  "あなたは最後までやり遂げられる力を持っています。",
+  "本番の緊張に負けない自信を作りましょう。",
+  "周囲の状況を気にせず、自分に集中を。",
+  "今が合格への最後のチャンスかもしれません。",
+  "目標点に達するまで、全力を尽くしてください。",
+  "すべての努力は、結果に繋がります。",
+  "試験の壁を突破する瞬間が近づいています。",
+  "全力で取り組むことが、最高の結果を生む。",
+  "残り時間を意識して、効率よく進めましょう。",
+  "合格は、諦めなかった人だけに訪れる。",
+  "ここまで頑張った自分を信じてください。",
+  "最後の10分が、運命を分けるかもしれません。",
+  "試験問題を解ける力は、今ここにあります。",
+  "あなたの努力を、誰よりも応援しています。",
+  "ゴールはすぐそこです。最後まで駆け抜けて！",
+  "問題の本質を見抜く力を磨くときです。",
+  "未来の自分が、今のあなたに感謝します。",
+  "何があっても、合格への道を信じて！"
+];
+
+    const colors = [
+      "red",    // 最初の色
+      "orange", 
+      "yellow",
+      "green", 
+      "blue", 
+      "purple", 
+      "pink",
+      "brown", 
+      "gray",
+      "black"
+    ];
+
+    let colorIndex = 0; // 色のインデックス
+
+    const updateView = () => {
+      const selectedView = viewSelector.value;
+      timerDisplay.style.display = selectedView === "both" || selectedView === "countdown" ? "block" : "none";
+      elapsedDisplay.style.display = selectedView === "both" || selectedView === "elapsed" ? "block" : "none";
+    };
+
+    startButton.addEventListener('click', () => {
+      clearInterval(intervalId);
+      clearInterval(messageIntervalId);
+
+      const targetTime = new Date(datetimePicker.value).getTime();
+      if (isNaN(targetTime)) {
+        alert('有効な日時を選択してください。');
+        return;
+      }
+
+      startTime = Date.now();
+
+      intervalId = setInterval(() => {
+        const now = Date.now();
+        const remainingTime = targetTime - now;
+        const elapsedTime = Math.floor((now - startTime) / 1000);
+
+        // カウントダウン更新
+        if (remainingTime <= 0) {
+          timerDisplay.textContent = "カウントダウン: 0日 0時間 0分 0.0秒";
+        } else {
+          const days = Math.floor(remainingTime / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((remainingTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = (remainingTime % (1000 * 60)) / 1000;
+          timerDisplay.textContent = `カウントダウン: ${days}日 ${hours}時間 ${minutes}分 ${seconds.toFixed(1)}秒`;
+
+          // 30分ごとに色を変更
+          const minutesRemaining = Math.floor(remainingTime / (1000 * 60)); // 残り分数
+          const newColorIndex = Math.floor(minutesRemaining / 30) % colors.length; // 30分ごとに色を変更
+
+          // 色が変わるタイミングで色を変更
+          if (newColorIndex !== colorIndex) {
+            colorIndex = newColorIndex;
+            timerDisplay.style.color = colors[colorIndex]; // カウントダウンの色を変更
+          }
+        }
+
+        // 経過時間更新
+        const elapsedHours = Math.floor(elapsedTime / 3600);
+        const elapsedMinutes = Math.floor((elapsedTime % 3600) / 60);
+        const elapsedSeconds = elapsedTime % 60;
+        elapsedDisplay.textContent = `経過時間: ${elapsedHours}時間 ${elapsedMinutes}分 ${elapsedSeconds}秒`;
+
+        // 経過時間色変更
+        if (elapsedTime > 3600) { // 1時間以上経過
+          elapsedDisplay.classList.add("urgent");
+        } else {
+          elapsedDisplay.classList.remove("urgent");
+        }
+      }, 100);
+
+      // メッセージ更新
+      const updateMessage = () => {
+        const randomIndex = Math.floor(Math.random() * messages.length);
+        messageDisplay.textContent = messages[randomIndex];
+      };
+
+      updateMessage();
+      messageIntervalId = setInterval(updateMessage, 5 * 60 * 1000);
+    });
+
+    viewSelector.addEventListener('change', updateView);
+    updateView();
+  </script>
+</body>
+</html>
